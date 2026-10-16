@@ -13,6 +13,20 @@ birebir uyacak şekilde tasarlanmıştır.
 | Öğrenci | Başlık / yazar / ISBN ile kitap arama, raftaki kopya sayısını görme, ödünç alma, iade etme, ödünç geçmişi |
 | Yönetici | Stok adediyle kitap ekleme, gecikme raporu |
 
+## Ekran görüntüleri
+
+**Kitap arama (öğrenci):** Rafta kaç kopya kaldığı görünür, kopya kalmadıysa ödünç alma düğmesi kapanır.
+
+![Kitap arama ekranı](docs/ekran-goruntuleri/katalog.png)
+
+**Ödünçlerim (öğrenci):** Elindeki kitaplar, son teslim tarihi, gecikme durumu ve geçmiş.
+
+![Ödünçlerim ekranı](docs/ekran-goruntuleri/oduncler.png)
+
+**Yönetim (yönetici):** Kitap ekleme formu ve en çok gecikenden başlayan gecikme raporu.
+
+![Yönetim ekranı](docs/ekran-goruntuleri/yonetim.png)
+
 **İş kuralları** ([backend/app/ayarlar.py](backend/app/ayarlar.py) dosyasından değiştirilebilir):
 
 - Ödünç süresi 14 gündür.
@@ -83,6 +97,128 @@ Testler geçici bir SQLite veritabanı kullanır, PostgreSQL gerektirmez.
 `uyelik`, `katalog`, `odunc_islemleri` ve `raporlama` klasörleri Package Diagram'daki dört pakete karşılık gelir.
 Class Diagram'daki metotlar sınıfların içinde aynı adla yazılmıştır
 (`Uye.odunc_al()`, `Odunc.iade_et()`, `Stok.azalt()`, `Yonetici.kitap_ekle()` …).
+
+## UML diyagramları
+
+Aşağıdaki diyagramlar koddan çıkarılmıştır; sınıf, metot ve paket adları koddakilerle aynıdır.
+
+### Class Diagram
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Uye {
+        +int uye_id
+        +str ad
+        +str ogrenci_no
+        +str email
+        +aktif_oduncler() list~Odunc~
+        +kitap_ara(katalog, anahtar) list~Kitap~
+        +odunc_al(kitap, tarih) Odunc
+    }
+    class Yonetici {
+        +int yonetici_id
+        +str ad
+        +kitap_ekle(baslik, yazar, isbn, adet) Kitap
+        +gecikme_raporu_al(oduncler, tarih) GecikmeRaporu
+    }
+    class Kitap {
+        +int kitap_id
+        +str baslik
+        +str yazar
+        +str isbn
+        +musait_mi() bool
+    }
+    class Stok {
+        +int stok_id
+        +int toplam_adet
+        +int mevcut_adet
+        +azalt()
+        +arttir()
+    }
+    class Odunc {
+        +int odunc_id
+        +date alis_tarihi
+        +date son_teslim_tarihi
+        +date iade_tarihi
+        +iade_et(tarih)
+        +gecikme_gunu(tarih) int
+        +gecikmis_mi(tarih) bool
+    }
+    class GecikmeRaporu {
+        +date olusturma_tarihi
+        +list~GecikmeSatiri~ satirlar
+        +olustur(oduncler)
+        +toplam() int
+    }
+
+    Uye "1" -- "0..*" Odunc : yapar
+    Odunc "0..*" -- "1" Kitap : konu
+    Kitap "1" *-- "1" Stok : sahip
+    Yonetici "1" -- "0..*" Kitap : ekler
+    Yonetici ..> GecikmeRaporu : oluşturur
+    GecikmeRaporu o-- "0..*" Odunc : listeler
+```
+
+- **Odunc**, Uye ile Kitap arasındaki ilişki sınıfıdır. Ödünç tarihi, son teslim tarihi ve iade tarihi burada tutulur.
+- **Kitap ◆— Stok** bir composition ilişkisidir: kitap silinirse stoğu da silinir.
+- **GecikmeRaporu ◇— Odunc** bir aggregation ilişkisidir: rapor ödünçleri listeler ama onlara sahip değildir ve veritabanında saklanmaz.
+
+### Package Diagram
+
+```mermaid
+flowchart LR
+    subgraph app["app"]
+        uyelik["uyelik<br/><small>Uye, Yonetici</small>"]
+        katalog["katalog<br/><small>Kitap, Stok, Katalog</small>"]
+        odunc["odunc_islemleri<br/><small>Odunc, OduncServisi</small>"]
+        rapor["raporlama<br/><small>GecikmeRaporu</small>"]
+    end
+
+    uyelik -. import .-> katalog
+    uyelik -. import .-> odunc
+    uyelik -. import .-> rapor
+    odunc -. import .-> katalog
+    odunc -. import .-> uyelik
+    rapor -. import .-> odunc
+```
+
+### Object Diagram
+
+Örnek verideki senaryo: Ali Yılmaz, 3 kopyası olan "Suç ve Ceza"yı bugün ödünç alıyor.
+
+```mermaid
+flowchart LR
+    ali["<u>ali : Uye</u><br/>ad = Ali Yılmaz<br/>ogrenci_no = 220101045"]
+    o1["<u>o1 : Odunc</u><br/>alis_tarihi = bugün<br/>son_teslim_tarihi = bugün + 14 gün<br/>iade_tarihi = null"]
+    kitap["<u>sucVeCeza : Kitap</u><br/>baslik = Suç ve Ceza<br/>yazar = Fyodor Dostoyevski"]
+    stok["<u>stok1 : Stok</u><br/>toplam_adet = 3<br/>mevcut_adet = 2"]
+
+    ali --- o1
+    o1 --- kitap
+    kitap --- stok
+```
+
+### Deployment Diagram
+
+```mermaid
+flowchart LR
+    subgraph istemci["Kullanıcı bilgisayarı"]
+        tarayici["Web tarayıcısı"]
+    end
+    subgraph sunucu["Sunucu"]
+        react["Frontend<br/>React + Vite<br/>:5173"]
+        api["Backend<br/>FastAPI + Uvicorn<br/>:8000"]
+        subgraph docker["Docker"]
+            db[("PostgreSQL 16<br/>:5432")]
+        end
+    end
+
+    tarayici -- HTTP --> react
+    react -- "REST /api (JSON)" --> api
+    api -- "SQLAlchemy / psycopg" --> db
+```
 
 ## API uç noktaları
 
