@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/kutuphane.db
+
+# Node
+node_modules/
+frontend/dist/
+
+# Editör / sistem
+.vscode/
+.DS_Store
+Thumbs.db
